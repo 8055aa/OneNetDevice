@@ -1,0 +1,507 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Filename: whileLoop.py
+# using: time,sqlite3
+from msilib.schema import ListBox
+
+__author__ = 'Tomas Yang'
+
+import json
+import time as t
+import sqlite3, os
+import urllib.request
+import requests
+import json
+import tkinter as  tk
+import glob
+from pygame import mixer
+from bs4 import BeautifulSoup
+
+
+class MyTimer():
+
+    def __init__(self):
+        self.unit = ['年', '月', '天', '小时', '分钟', '秒']
+        self.prompt = "未开始计时！！"
+        self.lasted = []
+        self.begin = 0
+        self.end = 0
+
+    def __str__(self):
+
+        return self.prompt
+
+    __repr__ = __str__
+
+    def __add__(self, other):
+        prompt = "总共运行了"
+        result = []
+        for index in range(6):
+            result.append(self.lasted[index] + other.lasted[index])
+            if result[index]:
+                prompt += (str(result[index]) + self.unit[index])
+        return prompt
+
+    # 开始计时
+    def start(self):
+        self.begin = t.localtime()
+        self.prompt = "提示：请先调用 stop()停止计时。"
+        print("计时开始.....")
+
+    # 停止计时
+    def stop(self):
+        if not self.begin:
+            print("提示： 请先调用start() 进行计时！！")
+        else:
+
+            self.end = t.localtime()
+            print("计时停止!")
+            self._calc()
+
+    # 内部方法，计算运行时间
+    def _calc(self):
+        self.lasted = []
+        self.prompt = "总共运行了"
+        for index in range(6):
+            self.lasted.append(self.end[index] - self.begin[index])
+            if self.lasted[index]:
+                self.prompt += (str(self.lasted[index]) + self.unit[index])
+        print("time cost : ", self.prompt)
+        # 为下一轮计时初始化变量
+        self.begin = 0
+        self.end = 0
+
+
+class SqliteHelper:
+    myVersion = 0.1
+
+    def __init__(self, dataFile):
+        try:
+            self.conn = sqlite3.connect(dataFile)
+        except sqlite3.Error as e:
+            print("连接sqlite数据库失败:", e.args[0])
+
+    def getcursor(self):
+        return self.conn.cursor()
+
+    def drop(self, table):
+        '''
+        if the table exist,please be carefull
+        '''
+        if table is not None and table != '':
+            cu = self.getcursor()
+            sql = 'DROP TABLE IF EXISTS ' + table
+            try:
+                cu.execute(sql)
+            except sqlite3.Error as why:
+                print("delete table failed:", why.args[0])
+                return
+            self.conn.commit()
+            print("delete table successful!")
+            cu.close()
+        else:
+            print("table does not exist！")
+
+    def create(self, sql):
+        '''
+        create database table
+        :param sql:
+        :return:
+        '''
+        if sql is not None and sql != '':
+            cu = self.getcursor()
+            try:
+                cu.execute(sql)
+            except sqlite3.Error as why:
+                print("create table failed:", why.args[0])
+                return
+            self.conn.commit()
+            print("create table successful!")
+            cu.close()
+        else:
+            print("sql is empty or None")
+
+    def insert(self, sql, data):
+        '''
+        insert data to the table
+        :param sql:
+        :param data:
+        :return:
+        '''
+        if sql is not None and sql != '':
+            if data is not None:
+                cu = self.getcursor()
+                try:
+                    for d in data:
+                        cu.execute(sql, d)
+                        self.conn.commit()
+                except sqlite3.Error as why:
+                    print("insert data failed:", why.args[0])
+                cu.close()
+        else:
+            print("sql is empty or None")
+
+    def fetchall(self, sql):
+        '''
+        query all data
+        :param sql:
+        :return:
+        '''
+        if sql is not None and sql != '':
+            cu = self.getcursor()
+            try:
+                cu.execute(sql)
+                content = cu.fetchall()
+                # if len(content) > 0:
+                #     for item in content:
+                #         for element in item:
+                #             print(element,)
+                #         print('- - - - - - - - - - - - - - - - -')
+                # else:
+                #     for element in content:
+                #         print(element,)
+                #     print(' ')
+            except sqlite3.Error as why:
+                print("fetchall data failed:", why.args[0])
+            print("contents ==> ", content)
+            cu.close()
+        else:
+            print("sql is empty or None")
+
+    def fetchone(self, sql, data):
+        '''
+        query one data
+        :param sql:
+        :param data:
+        :return:
+        '''
+        if sql is not None and sql != '':
+            if data is not None:
+                cu = self.getcursor()
+                try:
+                    d = (data,)
+                    cu.execute(sql, d)
+                    content = cu.fetchall()
+                    if len(content) > 0:
+                        for item in content:
+                            for element in item:
+                                print(element, )
+                            print('')
+                    else:
+                        for element in content:
+                            print(element, )
+                        print('')
+                except sqlite3.Error as why:
+                    print("fetch the data failed:", why.args[0])
+                    return
+                cu.close()
+        else:
+            print("sql is empty or None")
+
+    def update(self, sql, data):
+        '''
+        update the data
+        :param sql:
+        :param data:
+        :return:
+        '''
+        if sql is not None and sql != '':
+            if data is not None:
+                cu = self.getcursor()
+                try:
+                    for d in data:
+                        cu.execute(sql, d)
+                        self.conn.commit()
+                except sqlite3.Error as why:
+                    print("update data failed:", why.args[0])
+                cu.close()
+        else:
+            print("sql is empty or None")
+
+    def delete(self, sql, data=None):
+        '''
+        delete the data
+        :param sql:
+        :param data:
+        :return:
+        '''
+        if sql is not None and sql != '':
+            cu = self.getcursor()
+            if data is not None:
+                try:
+                    for d in data:
+                        cu.execute(sql, d)
+                        self.conn.commit()
+                except sqlite3.Error as why:
+                    print("delete data failed:", why.args[0])
+            else:
+                try:
+                    cu.execute(sql)
+                    self.conn.commit()
+                except sqlite3.Error as why:
+                    print("delete data failed:", why.args[0])
+            cu.close()
+        else:
+            print("sql is empty or None")
+
+    def __del__(self):
+        self.conn.close()
+
+
+# test
+# TABLE_NAME = 'student'
+
+
+def drop_table_test():
+    '''删除数据库表测试'''
+    print('删除数据库表测试...')
+    sqlhelper = SqliteHelper('test.db')
+    sqlhelper.drop('student')
+
+
+def create_table_test():
+    '''创建数据库表测试'''
+    print('创建数据库表测试...')
+    # 创建表（id,name,gender,age,address,phone)
+    create_table_sql = '''CREATE TABLE `student` (
+                          `id` int(11) NOT NULL,
+                          `name` varchar(20) NOT NULL,
+                          `gender` varchar(4) DEFAULT NULL,
+                          `age` int(11) DEFAULT NULL,
+                          `address` varchar(200) DEFAULT NULL,
+                          `phone` varchar(20) DEFAULT NULL,
+                           PRIMARY KEY (`id`)
+                        )'''
+    sqlhelper = SqliteHelper('test.db')
+    sqlhelper.create(create_table_sql)
+
+
+sqlhelper = SqliteHelper('test.db')
+
+
+def save_test():
+    '''保存数据测试...'''
+    print('保存数据测试...')
+    save_sql = 'INSERT INTO student values (?, ?, ?, ?, ?, ?)'
+    data = [(1, 'Zhang', u'男', 15, u'北京', '12345678910'),
+            (2, 'Li', u'男', 50, u'吉林省长春市', '1567891****'),
+            (3, 'Zhao', u'女', 40, u'黑龙江', '18*********'),
+            (4, 'Xi', u'女', 30, u'上海', '1**********'),
+            (5, 'Liao', u'男', 15, u'湖南', '12345678910'),
+            (6, 'Ling', u'男', 50, u'大理', '1567891****'),
+            (7, 'JJJ', u'女', 40, u'***', '18*********'),
+            (8, 'LLL', u'女', 30, u'Hongkong', '1**********')]
+
+    sqlhelper.insert(save_sql, data)
+
+
+def fetchall_test():
+    '''查询所有数据...'''
+    print('查询所有数据...')
+    fetchall_sql = '''SELECT * FROM student '''
+    sqlhelper.fetchall(fetchall_sql)
+
+
+def fetchone_test():
+    '''查询所有数据...'''
+    print('查询一条数据...')
+    fetchall_sql = '''SELECT * FROM student  WHERE ID = ? '''
+    data = 1
+    sqlhelper.fetchone(fetchall_sql, data)
+    update_sql = '''UPDATE student  SET name = ? WHERE ID = ? '''
+    data = [(1, 'James'),
+            (2, 'Kobe')]
+    sqlhelper.update(update_sql, data)
+
+
+def update_test():
+    '''更新数据'''
+    print('更新一条数据...')
+    update_sql = '''UPDATE student  SET name = ? WHERE ID = ? '''
+    data = [('James', 1),
+            ('Kobe', 2)]
+    sqlhelper.update(update_sql, data)
+
+
+def delete_test():
+    '''删除数据'''
+    print('删除一条数据...')
+    update_sql = '''DELETE FROM student  WHERE ID = ? AND NAME = ?'''
+    data = [(1, 'James')]
+    sqlhelper.delete(update_sql, data)
+    # 产品类
+
+
+class Device():
+    def __init__(self, DEVICEID, APIKEY):
+        self.DEVICEID = DEVICEID
+        self.APIKEY = APIKEY
+        self.url = 'http://api.heclouds.com/devices/%s/datapoints' % (self.DEVICEID)
+        self.headers = {"api-key": self.APIKEY, "Connection": "close"}
+
+    def upload_point(self, DataStreamName, VALUE):
+        dict = {"datastreams": [{"id": "id", "datapoints": [{"value": 0}]}]}
+        dict['datastreams'][0]['id'] = DataStreamName
+        dict['datastreams'][0]['datapoints'][0]['value'] = VALUE
+        if "succ" in requests.post(self.url, headers=self.headers, data=json.dumps(dict)).text:
+            print("Value:", VALUE, " has been uploaded to ", DataStreamName, " at ", t.ctime())
+
+    def get_point(self, DataStreamName):
+        data = json.loads(requests.get(self.url, headers=self.headers, ).text)
+        for i in data['data']['datastreams']:
+            if i["id"] == DataStreamName:
+                return float(i['datapoints'][0]['value'])
+                # return str(i['datapoints'][0]['at'])
+        else:
+            return "Not found DataStreamName - %s " % DataStreamName
+
+    def get_DeviceID(self):
+        L = list()
+        data = json.loads(requests.get(self.url, headers=self.headers, ).text)
+        for i in data['data']['datastreams']:
+            L.append(i["id"])
+        return L
+
+def create_table_device():
+    """//
+    mySqlite = SqliteHelper('test.db')
+    sqlstr = 'insert into T_DeviceInfo values (?, ?)'
+    fetchall_sql = '''SELECT * FROM T_DeviceInfo '''
+    data = [(111111,"NB0001"),(111122,"NB0001"),]
+    # mySqlite.insert(sqlstr,data)
+    mySqlite.fetchall(fetchall_sql) ///"""
+    # SQLITE数据库中的产品表名
+    create_table_sql = '''CREATE TABLE `t_device` (
+                          `idOut` int(11) NOT NULL,
+                          `idName` int(20) NOT NULL,                     
+                          `value` varchar(200) DEFAULT NULL,                       
+                           PRIMARY KEY (`idOut`))'''
+    sqlhelper = SqliteHelper('test.db')
+    sqlhelper.drop('t_device')
+    sqlhelper.create(create_table_sql)
+
+def main(self):
+        # myTimer = MyTimer()
+        # myTimer.start()
+        # n = 0
+        # for i in range(1, 10001):
+        #     for j in range(1,10001):
+        #         n += 1
+        # myTimer.stop()
+        create_table_device(self)
+        save_sql = 'INSERT INTO t_device values (?, ?, ?)'
+
+        DeviceID = '43172493'  # 设备ID
+        ApiKey = self.content  # APIKey管理中的默认APIKEY
+        # DataStreamName = '3315_0_5700'  # 数据流名称，没有则新建数据流
+        device = Device(DeviceID, ApiKey)
+        # device.upload_point(DataStreamName, 66)  # 向数据流中添加新数据
+        #  print(device.get_point(DataStreamName))  # 查询数据流中的最新数据
+        deviceIDlist = device.get_DeviceID(self)
+        listDevice = []
+        # print(deviceIDlist)
+        for i, v in enumerate(deviceIDlist):
+            # print("No.:{0}   ID:{1}   value={2}".format(i + 1, v, device.get_point(v)))
+            tupleDevice = (i + 1, v, device.get_point(v))
+            listDevice.append(tupleDevice)
+        self.msg.set(listDevice)
+        sqlhelper.insert(save_sql, listDevice)
+
+
+if __name__ == '__main__':
+    userTxt = ""
+    index = 0
+    def choose():
+        with open(userTxt, 'r') as f:
+            content = f.readline().replace("\n","")            
+            msg.set("\n 读取用户Api_Key: " + content)
+        return content
+
+    def openApiKey():
+        with open(userTxt, 'r') as f:
+            content = f.readline().replace("\n","")      
+            msg.set("\n 打开用户Api_Key : {}".format(content))
+        return content
+
+    def addAdevice():
+        create_table_device()
+        save_sql = 'INSERT INTO t_device values (?, ?, ?)'
+
+        DeviceID = '43172493'  # 设备ID
+        ApiKey = openApiKey()  # APIKey管理中的默认APIKEY
+		# msg.set("pi_Key : {}".format(content))
+        # DataStreamName = '3315_0_5700'  # 数据流名称，没有则新建数据流
+        device = Device(DeviceID, ApiKey)
+        # device.upload_point(DataStreamName, 66)  # 向数据流中添加新数据      
+        #  print(device.get_point(DataStreamName))  # 查询数据流中的最新数据
+        deviceIDlist = device.get_DeviceID()
+        listDevice = []
+        # print(deviceIDlist)
+        for i, v in enumerate(deviceIDlist):
+            # print("No.:{0} ID:{1} value={2}".format(i + 1, v,
+            # device.get_point(v)))
+            tupleDevice = (i + 1, v, device.get_point(v))
+            listDevice.append(tupleDevice)			
+        listb.delete(0, 'end')
+        m = 0
+        for item in deviceIDlist:
+            listb.insert(0, item)
+            m+=1
+        msg.set("一共读取到 {0:10d} 个设备".format(m))
+        sqlhelper.insert(save_sql, listDevice)
+
+    def exitWin():
+        # mixer.music.stop()
+        win.destroy()
+
+    content = ""
+    win = tk.Tk()
+    win.geometry("720x380")
+    win.title("设备管理")
+
+    labeltitle = tk.Label(win, text="\n OneNet设备ID", fg="red", font=("新细明体", 10))
+    labeltitle.grid(row=0, column=0,columnspan=3, padx=5, pady=5)
+
+    frame1 = tk.Frame(win)
+    frame1.grid(row=1, column=3)
+    source_dir = "user/"
+    userApiKey = glob.glob(source_dir + "*.txt")
+
+    choice = tk.StringVar()
+    for key in userApiKey:
+        rbtem = tk.Radiobutton(frame1, text=key, variable=choice, value=key, command=choose, font=("新细明体", 10))
+        if (index == 0):
+            rbtem.select()
+            userTxt = key
+        rbtem.grid(row=index+1, column=3, sticky='w')
+        index += 1
+    msg = tk.StringVar()
+    msg.set("\n 请先读取Api_key :")
+    label = tk.Label(win, textvariable=msg, fg="blue", font=("新细明体", 10))
+    label.grid(row=0, column=2, columnspan=3,padx=5, pady=5)
+    #labelsep = tk.Label(win, text="\n")
+    #labelsep.grid()
+
+    frame2 = tk.Frame(win)
+    frame2.grid(row=1, column=1)
+    listb = tk.Listbox(frame2,font=("新细明体",14))
+    listb.grid(row=1, column=1,rowspan=4)
+    sl = tk.Scrollbar(frame2,width=25,command= listb.yview)
+    
+    sl.grid(row=1,column=2,rowspan=4,sticky=tk.NS)
+    listb.config(yscrollcommand=sl.set)
+   
+    button1 = tk.Button(frame2, text="打开用户ApiKey", width=17, command=openApiKey)
+    button1.grid(row=3, column=0, padx=5, pady=5)
+    button2 = tk.Button(frame2, text="读取OneNet设备", width=17, command=addAdevice)
+    button2.grid(row=2, column=0, padx=5, pady=5)
+    button3 = tk.Button(frame2, text="结束", width=13, command=exitWin)
+    button3.grid(row=4, column=0, padx=5, pady=5)
+    win.protocol("WM_DELETE_WINDOW", exitWin)
+    win.mainloop()
+
+
+    print('程序自身运行')
+else:
+    print('我来自另一个模块')
+
